@@ -1,7 +1,9 @@
 use {
-    std::{fmt, sync::Mutex, thread, time::Duration},
+    std::{error, fmt, sync::Mutex, thread, time::Duration},
     swayipc::{Connection, Event, EventType, InputChange},
 };
+
+type Error = Box<dyn error::Error>;
 
 fn main() {
     if let Err(err) = run() {
@@ -11,11 +13,11 @@ fn main() {
 
 fn run() -> Result<(), Error> {
     let mut conn = Connection::new()?;
-    let inputs = conn.get_inputs()?;
-    let input = inputs
+    let input = conn
+        .get_inputs()?
         .into_iter()
         .find(|input| input.xkb_active_layout_name.is_some())
-        .ok_or(Error::InputNotFound)?;
+        .ok_or(InputNotFound)?;
 
     let current_input = input.identifier;
     let current_layout = input
@@ -51,22 +53,13 @@ fn layout_event(layout: &str) {
     println!("layout: {layout}");
 }
 
-enum Error {
-    Sway(swayipc::Error),
-    InputNotFound,
-}
+#[derive(Debug)]
+struct InputNotFound;
 
-impl From<swayipc::Error> for Error {
-    fn from(v: swayipc::Error) -> Self {
-        Self::Sway(v)
-    }
-}
-
-impl fmt::Display for Error {
+impl fmt::Display for InputNotFound {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Sway(err) => write!(f, "{err}"),
-            Self::InputNotFound => write!(f, "input not found"),
-        }
+        write!(f, "input not found")
     }
 }
+
+impl error::Error for InputNotFound {}
